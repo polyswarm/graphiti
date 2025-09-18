@@ -1729,7 +1729,7 @@ async def get_edge_invalidation_candidates(
         result['search_edge_uuid']: [
             get_entity_edge_from_record(record, driver.provider) for record in result['matches']
         ]
-        for result in results
+        for result in results if 'search_edge_uuid' in result
     }
 
     invalidation_edges = [invalidation_edges_dict.get(edge.uuid, []) for edge in edges]
