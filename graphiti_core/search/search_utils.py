@@ -1594,11 +1594,12 @@ async def get_edge_invalidation_candidates(
         # Calculate Cosine similarity then return the edge ids
         input_ids = []
         for r in resp:
-            score = calculate_cosine_similarity(
-                list(map(float, r['source_embedding'].split(','))), r['target_embedding']
-            )
-            if score > min_score:
-                input_ids.append({'id': r['id'], 'score': score, 'uuid': r['search_edge_uuid']})
+            if 'source_embedding' in r and 'target_embedding' in r:
+                score = calculate_cosine_similarity(
+                    list(map(float, r['source_embedding'].split(','))), r['target_embedding']
+                )
+                if score > min_score:
+                    input_ids.append({'id': r.get('id'), 'score': score, 'uuid': r.get('search_edge_uuid')})
 
         # Match the edge ides and return the values
         query = """
