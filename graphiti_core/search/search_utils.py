@@ -1407,7 +1407,7 @@ async def get_relevant_edges(
         input_ids = []
         for r in resp:
             score = calculate_cosine_similarity(
-                list(map(float, r.get('source_embedding', '0').split(','))), r.get('target_embedding')
+                list(map(float, r.get('source_embedding', '0').split(','))), r.get('target_embedding', 0)
             )
             if score > min_score:
                 input_ids.append({'id': r.get('id'), 'score': score, 'uuid': r.get('search_edge_uuid')})
