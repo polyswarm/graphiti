@@ -1406,12 +1406,11 @@ async def get_relevant_edges(
         # Calculate Cosine similarity then return the edge ids
         input_ids = []
         for r in resp:
-            if 'source_embedding' in r and 'target_embedding' in r:
-                score = calculate_cosine_similarity(
-                    list(map(float, r['source_embedding'].split(','))), r['target_embedding']
-                )
-                if score > min_score:
-                    input_ids.append({'id': r['id'], 'score': score, 'uuid': r['search_edge_uuid']})
+            score = calculate_cosine_similarity(
+                list(map(float, r.get('source_embedding', '').split(','))), r.get('target_embedding')
+            )
+            if score > min_score:
+                input_ids.append({'id': r.get('id'), 'score': score, 'uuid': r.get('search_edge_uuid')})
 
         # Match the edge ides and return the values
         query = """
@@ -1538,10 +1537,10 @@ async def get_relevant_edges(
         )
 
     relevant_edges_dict: dict[str, list[EntityEdge]] = {
-        result['search_edge_uuid']: [
+        result.get('search_edge_uuid', result.get('uuid', '')): [
             get_entity_edge_from_record(record, driver.provider) for record in result['matches']
         ]
-        for result in results if 'search_edge_uuid' in result
+        for result in results
     }
 
     relevant_edges = [relevant_edges_dict.get(edge.uuid, []) for edge in edges]
@@ -1594,12 +1593,11 @@ async def get_edge_invalidation_candidates(
         # Calculate Cosine similarity then return the edge ids
         input_ids = []
         for r in resp:
-            if 'source_embedding' in r and 'target_embedding' in r:
-                score = calculate_cosine_similarity(
-                    list(map(float, r['source_embedding'].split(','))), r['target_embedding']
-                )
-                if score > min_score:
-                    input_ids.append({'id': r.get('id'), 'score': score, 'uuid': r.get('search_edge_uuid')})
+            score = calculate_cosine_similarity(
+                list(map(float, r.get('source_embedding', '').split(','))), r.get('target_embedding')
+            )
+            if score > min_score:
+                input_ids.append({'id': r.get('id'), 'score': score, 'uuid': r.get('search_edge_uuid')})
 
         # Match the edge ides and return the values
         query = """
@@ -1726,10 +1724,10 @@ async def get_edge_invalidation_candidates(
             **filter_params,
         )
     invalidation_edges_dict: dict[str, list[EntityEdge]] = {
-        result['search_edge_uuid']: [
+        result.get('search_edge_uuid', result.get('uuid', '')): [
             get_entity_edge_from_record(record, driver.provider) for record in result['matches']
         ]
-        for result in results if 'search_edge_uuid' in result
+        for result in results
     }
 
     invalidation_edges = [invalidation_edges_dict.get(edge.uuid, []) for edge in edges]
