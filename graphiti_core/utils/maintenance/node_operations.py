@@ -269,7 +269,10 @@ async def resolve_extracted_nodes(
         resolution_id: int = resolution.id
         duplicate_idx: int = resolution.duplicate_idx
 
-        extracted_node = extracted_nodes[resolution_id]
+        try:
+            extracted_node = extracted_nodes[resolution_id]
+        except IndexError:
+            continue
 
         resolved_node = (
             existing_nodes[duplicate_idx]

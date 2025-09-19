@@ -1538,7 +1538,7 @@ async def get_relevant_edges(
 
     relevant_edges_dict: dict[str, list[EntityEdge]] = {
         result.get('search_edge_uuid', result.get('uuid', '')): [
-            get_entity_edge_from_record(record, driver.provider) for record in result['matches']
+            get_entity_edge_from_record(record, driver.provider) for record in result.get('matches', [])
         ]
         for result in results
     }
