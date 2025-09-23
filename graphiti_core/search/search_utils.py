@@ -86,6 +86,46 @@ def calculate_cosine_similarity(vector1: list[float], vector2: list[float]) -> f
     return dot_product / (norm_vector1 * norm_vector2)
 
 
+def _lucene_sanitize(query: str) -> str:
+    # Escape special characters from a query before passing into Lucene
+    # + - && || ! ( ) { } [ ] ^ " ~ * ? : \ /
+    escape_map = str.maketrans(
+        {
+            '+': r'\+',
+            '-': r'\-',
+            '&': r'\&',
+            '|': r'\|',
+            '!': r'\!',
+            '(': r'\(',
+            ')': r'\)',
+            '{': r'\{',
+            '}': r'\}',
+            '[': r'\[',
+            ']': r'\]',
+            '^': r'\^',
+            '"': r'\"',
+            "'": r"\'",
+            '~': r'\~',
+            '*': r'\*',
+            '?': r'\?',
+            ':': r'\:',
+            '\\': r'\\',
+            '/': r'\/',
+            '@': r'\@',
+            '%': r'\%',
+            'O': r'\O',
+            'R': r'\R',
+            'N': r'\N',
+            'T': r'\T',
+            'A': r'\A',
+            'D': r'\D',
+        }
+    )
+
+    sanitized = query.translate(escape_map)
+    return sanitized
+
+
 def fulltext_query(query: str, group_ids: list[str] | None, driver: GraphDriver):
     if driver.provider == GraphProvider.KUZU:
         # Kuzu only supports simple queries.
@@ -103,7 +143,7 @@ def fulltext_query(query: str, group_ids: list[str] | None, driver: GraphDriver)
 
     group_ids_filter += ' AND ' if group_ids_filter else ''
 
-    lucene_query = lucene_sanitize(query)
+    lucene_query = _lucene_sanitize(query)
     # If the lucene query is too long return no query
     if len(lucene_query.split(' ')) + len(group_ids or '') >= MAX_QUERY_LENGTH:
         return ''
@@ -374,7 +414,7 @@ async def edge_similarity_search(
             # Calculate Cosine similarity then return the edge ids
             input_ids = []
             for r in resp:
-                if r['embedding']:
+                if 'embedding' in r and r['embedding']:
                     score = calculate_cosine_similarity(
                         search_vector, list(map(float, r['embedding'].split(',')))
                     )
@@ -772,7 +812,7 @@ async def node_similarity_search(
             # Calculate Cosine similarity then return the edge ids
             input_ids = []
             for r in resp:
-                if r['embedding']:
+                if 'embedding' in r:
                     score = calculate_cosine_similarity(
                         search_vector, list(map(float, r['embedding'].split(',')))
                     )
@@ -1191,7 +1231,7 @@ async def community_similarity_search(
             # Calculate Cosine similarity then return the edge ids
             input_ids = []
             for r in resp:
-                if r['embedding']:
+                if 'embedding' in r and r['embedding']:
                     score = calculate_cosine_similarity(
                         search_vector, list(map(float, r['embedding'].split(',')))
                     )
@@ -1535,10 +1575,10 @@ async def get_relevant_edges(
         input_ids = []
         for r in resp:
             score = calculate_cosine_similarity(
-                list(map(float, r['source_embedding'].split(','))), r['target_embedding']
+                list(map(float, r.get('source_embedding', '0').split(','))), r.get('target_embedding', 0)
             )
             if score > min_score:
-                input_ids.append({'id': r['id'], 'score': score, 'uuid': r['search_edge_uuid']})
+                input_ids.append({'id': r.get('id'), 'score': score, 'uuid': r.get('search_edge_uuid')})
 
         # Match the edge ides and return the values
         query = """
@@ -1665,8 +1705,8 @@ async def get_relevant_edges(
         )
 
     relevant_edges_dict: dict[str, list[EntityEdge]] = {
-        result['search_edge_uuid']: [
-            get_entity_edge_from_record(record, driver.provider) for record in result['matches']
+        result.get('search_edge_uuid', result.get('uuid', '')): [
+            get_entity_edge_from_record(record, driver.provider) for record in result.get('matches', [])
         ]
         for result in results
     }
@@ -1722,10 +1762,10 @@ async def get_edge_invalidation_candidates(
         input_ids = []
         for r in resp:
             score = calculate_cosine_similarity(
-                list(map(float, r['source_embedding'].split(','))), r['target_embedding']
+                list(map(float, r.get('source_embedding', '0').split(','))), r.get('target_embedding', 0)
             )
             if score > min_score:
-                input_ids.append({'id': r['id'], 'score': score, 'uuid': r['search_edge_uuid']})
+                input_ids.append({'id': r.get('id'), 'score': score, 'uuid': r.get('search_edge_uuid')})
 
         # Match the edge ides and return the values
         query = """
@@ -1852,8 +1892,8 @@ async def get_edge_invalidation_candidates(
             **filter_params,
         )
     invalidation_edges_dict: dict[str, list[EntityEdge]] = {
-        result['search_edge_uuid']: [
-            get_entity_edge_from_record(record, driver.provider) for record in result['matches']
+        result.get('search_edge_uuid', result.get('uuid', '')): [
+            get_entity_edge_from_record(record, driver.provider) for record in result.get('matches', [])
         ]
         for result in results
     }

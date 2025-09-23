@@ -17,6 +17,7 @@ limitations under the License.
 import asyncio
 import datetime
 import logging
+import os
 from collections.abc import Coroutine
 from typing import Any
 
@@ -30,6 +31,8 @@ from graphiti_core.driver.driver import (
     GraphDriverSession,
     GraphProvider,
 )
+
+from pydantic import SecretStr
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +120,7 @@ neptune_aoss_indices = [
 class NeptuneDriver(GraphDriver):
     provider: GraphProvider = GraphProvider.NEPTUNE
 
-    def __init__(self, host: str, aoss_host: str, port: int = 8182, aoss_port: int = 443):
+    def __init__(self, host: str, aoss_host: str, port: int = 8182, aoss_port: int = 443, use_https=True):
         """This initializes a NeptuneDriver for use with Neptune as a backend
 
         Args:
@@ -132,7 +135,15 @@ class NeptuneDriver(GraphDriver):
         if host.startswith('neptune-db://'):
             # This is a Neptune Database Cluster
             endpoint = host.replace('neptune-db://', '')
-            self.client = NeptuneGraph(endpoint, port)
+            aws_access_key_id = os.getenv('NEPTUNE_AWS_ACCESS_KEY_ID')
+            aws_secret_access_key = os.getenv('NEPTUNE_AWS_SECRET_ACCESS_KEY')
+            aws_region_name = os.getenv('NEPTUNE_AWS_REGION')
+            if aws_access_key_id and aws_secret_access_key and aws_region_name:
+                self.client = NeptuneGraph(endpoint, port, aws_access_key_id=SecretStr(aws_access_key_id),
+                                           aws_secret_access_key=SecretStr(aws_secret_access_key),
+                                           region_name=aws_region_name, use_https=use_https)
+            else:
+                self.client = NeptuneGraph(endpoint, port, use_https=use_https)
             logger.debug('Creating Neptune Database session for %s', host)
         elif host.startswith('neptune-graph://'):
             # This is a Neptune Analytics Graph
@@ -151,9 +162,9 @@ class NeptuneDriver(GraphDriver):
         self.aoss_client = OpenSearch(
             hosts=[{'host': aoss_host, 'port': aoss_port}],
             http_auth=Urllib3AWSV4SignerAuth(
-                session.get_credentials(), session.region_name, 'aoss'
+                session.get_credentials(), aws_region_name or 'us-east-2', 'es'
             ),
-            use_ssl=True,
+            use_ssl=use_https,
             verify_certs=True,
             connection_class=Urllib3HttpConnection,
             pool_maxsize=20,
@@ -199,7 +210,7 @@ class NeptuneDriver(GraphDriver):
     async def execute_query(
         self, cypher_query_, **kwargs: Any
     ) -> tuple[dict[str, Any], None, None]:
-        params = dict(kwargs)
+        params = kwargs.get('params', kwargs)
         if isinstance(cypher_query_, list):
             for q in cypher_query_:
                 result, _, _ = self._run_query(q[0], q[1])
